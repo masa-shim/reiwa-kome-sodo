@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ja" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【インタラクティブ解説】令和の米騒動の真相</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Earth (Warm neutrals like bg-stone-100, text-stone-800, with a muted green accent like bg-emerald-600 for key elements) -->
+    <!-- Application Structure Plan: The application is designed as a single-page narrative, guiding the user chronologically through the 'Reiwa Rice Disturbance' story, from its emergence to its root causes and potential solutions. This linear, scroll-based structure mirrors the logical flow of the source report, making a complex issue easy to follow. A sticky top navigation bar allows for non-linear exploration, enabling users to jump directly to sections of interest (The Crisis, Causes, Stockpile Facts, Contract Issues, Conclusion, AI Expert Q&A). Key interactions involve hover-to-reveal data on charts and click-to-expand 'myth-busting' cards, which break down complex topics into digestible pieces. This structure was chosen over a dense dashboard to prioritize storytelling and comprehension for a general audience unfamiliar with agricultural policy. -->
+    <!-- Visualization & Content Choices:
+        - Report Info: Price/CPI data -> Goal: Show rapid inflation -> Viz: Combined Bar (Price) & Line (CPI) Chart -> Interaction: Hover for tooltips -> Justification: Clearly visualizes the simultaneous spike in price and inflation rate -> Library: Chart.js
+        - Report Info: Supply/Demand/Stock data -> Goal: Show dwindling reserves -> Viz: Stacked Bar (Supply) & Line (Stock) Chart -> Interaction: Hover for tooltips -> Justification: Effectively shows the relationship between supply, demand, and shrinking end-of-year stock -> Library: Chart.js
+        - Report Info: Multiple causes of the crisis -> Goal: Organize complex factors -> Viz: HTML/Tailwind CSS Diagram -> Interaction: Static visual aid -> Justification: Provides a clear, at-a-glance overview of the crisis's multifaceted nature without overwhelming the user -> Library: HTML/CSS
+        - Report Info: Stockpile rice quality facts vs. myths -> Goal: Inform & Correct Misconceptions -> Viz: Interactive 'Q&A' Cards -> Interaction: Click to reveal answer -> Justification: Engages the user and presents information in a memorable, easy-to-digest format -> Library: HTML/CSS/JS
+        - Report Info: Discretionary contract vs. auction -> Goal: Compare & highlight issues -> Viz: Side-by-side HTML/Tailwind table/card -> Interaction: Static visual comparison -> Justification: Directly contrasts the two systems to emphasize the controversy around fairness and price -> Library: HTML/CSS
+        - Report Info: 'Agricultural Policy Triangle' -> Goal: Explain a complex political structure -> Viz: Simple HTML/Tailwind flowchart -> Interaction: Static visual aid -> Justification: Simplifies an abstract concept into an understandable relationship diagram -> Library: HTML/CSS
+        - Report Info: User questions -> Goal: Provide expert answers on rice/agricultural policy -> Viz: Text response -> Interaction: Text input, button click, loading indicator -> Justification: Enhances engagement and addresses specific user curiosities with LLM-powered insights -> Library: Gemini API (gemini-2.0-flash)
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f5f5f4; /* stone-100 */
+            color: #292524; /* stone-800 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 768px; /* max-w-3xl */
+            margin-left: auto;
+            margin-right: auto;
+            height: 400px;
+            max-height: 50vh;
+        }
+        .nav-link {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link.active, .nav-link:hover {
+            color: #059669; /* emerald-600 */
+            border-bottom-color: #059669;
+        }
+        .prose-custom {
+            max-width: 80ch;
+        }
+        .prose-custom h2 {
+            font-size: 1.875rem; /* text-3xl */
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #d6d3d1; /* stone-300 */
+        }
+         .prose-custom h3 {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700;
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            padding-left: 0.75rem;
+            border-left: 4px solid #10b981; /* emerald-500 */
+        }
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-in-out;
+        }
+        .loading-spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #059669;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header id="navbar" class="bg-stone-100/80 backdrop-blur-md sticky top-0 z-50 shadow-sm">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <a href="#prologue" class="text-xl font-bold text-emerald-700">米騒動の真相</a>
+                </div>
+                <div class="hidden md:block">
+                    <div class="ml-10 flex items-baseline space-x-4">
+                        <a href="#prologue" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">序章</a>
+                        <a href="#chapter1" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">第1章</a>
+                        <a href="#chapter2" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">第2章</a>
+                        <a href="#chapter3" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">第3章</a>
+                        <a href="#conclusion" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">結論</a>
+                        <a href="#gemini-feature" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-stone-700">AIに質問✨</a>
+                    </div>
+                </div>
+                <div class="md:hidden">
+                    <button id="mobile-menu-button" class="inline-flex items-center justify-center p-2 rounded-md text-stone-600 hover:text-emerald-700 hover:bg-stone-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-emerald-500">
+                        <span class="sr-only">メニューを開く</span>
+                        <canvas id="menu-icon" width="24" height="24"></canvas>
+                    </button>
+                </div>
+            </div>
+        </nav>
+        <div id="mobile-menu" class="md:hidden hidden">
+            <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+                <a href="#prologue" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">序章</a>
+                <a href="#chapter1" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">第1章 なぜ米がない？</a>
+                <a href="#chapter2" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">第2章 備蓄米とは？</a>
+                <a href="#chapter3" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">第3章 なぜ問題に？</a>
+                <a href="#conclusion" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">結論と提言</a>
+                <a href="#gemini-feature" class="block nav-link px-3 py-2 rounded-md text-base font-medium text-stone-700">AIに質問✨</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        <div class="prose-custom mx-auto">
+            
+            <section id="prologue" class="mb-24">
+                <p class="text-base text-emerald-600 font-semibold tracking-wide uppercase">Prologue</p>
+                <h1 class="mt-2 text-4xl font-extrabold tracking-tight text-stone-900 sm:text-5xl">【YouTube大学】<br>令和の米騒動、その深層</h1>
+                <p class="mt-6 text-xl text-stone-600">2024年、日本は「令和の米騒動」に揺れました。スーパーから米が消え、価格は高騰。しかし、米の生産量は「平年並み」。では一体なぜ？このページでは、複雑に絡み合った原因を一つずつ解き明かし、日本の食料問題の核心に迫ります。</p>
+            
+                <div class="mt-12 bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                    <h3 class="!mt-0 !border-none !pl-0">データで見る衝撃</h3>
+                    <p class="mt-2 text-stone-600">米の価格はわずか1年で異常な高騰を見せ、私たちの家計を直撃しました。このチャートは、その衝撃的な変化を視覚化したものです。棒グラフで価格の推移を、折れ線グラフで物価の上昇率を示しています。カーソルを合わせると詳細データが表示されます。</p>
+                    <div class="chart-container mt-6">
+                        <canvas id="priceChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chapter1" class="mb-24">
+                <h2>第1章 なぜ日本に米がないのか？</h2>
+                <p class="mt-4 text-lg text-stone-600">作況指数「平年並み」の裏で、市場から米が消えた謎。その原因は一つではありません。気候変動、需要の急増、流通の問題、そして私たちの心理まで。まるで複雑な方程式のように、複数の要因が絡み合ってこの事態を引き起こしたのです。ここでは、その要因を一つずつ分解して見ていきましょう。</p>
+                
+                <div class="mt-12 p-6 bg-white rounded-xl shadow-lg border border-stone-200">
+                    <h3 class="!mt-0 !border-none !pl-0">米不足を引き起こした5つの要因</h3>
+                     <div class="mt-6 grid grid-cols-1 md:grid-cols-5 gap-4 text-center text-sm">
+                        <div class="flex flex-col items-center p-3 bg-stone-50 rounded-lg">
+                           <div class="text-3xl">📉</div> <span class="font-bold mt-2">品質低下</span><p class="text-xs text-stone-500">猛暑による品質悪化</p>
+                        </div>
+                        <div class="hidden md:flex items-center justify-center text-3xl text-stone-400">+</div>
+                        <div class="flex flex-col items-center p-3 bg-stone-50 rounded-lg">
+                           <div class="text-3xl">📈</div> <span class="font-bold mt-2">需要急増</span><p class="text-xs text-stone-500">外食・インバウンド回復</p>
+                        </div>
+                         <div class="hidden md:flex items-center justify-center text-3xl text-stone-400">+</div>
+                        <div class="flex flex-col items-center p-3 bg-stone-50 rounded-lg">
+                           <div class="text-3xl">🔄</div> <span class="font-bold mt-2">流通・投機</span><p class="text-xs text-stone-500">買い占め・売り惜しみ</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-center my-4">
+                        <div class="text-3xl text-stone-400 transform rotate-90 md:rotate-0">→</div>
+                    </div>
+                     <div class="grid grid-cols-1 md:grid-cols-5 gap-4 text-center text-sm">
+                        <div class="flex flex-col items-center p-3 bg-stone-50 rounded-lg">
+                           <div class="text-3xl">🛒</div> <span class="font-bold mt-2">消費者心理</span><p class="text-xs text-stone-500">不安による買いだめ</p>
+                        </div>
+                        <div class="hidden md:flex items-center justify-center text-3xl text-stone-400">+</div>
+                        <div class="flex flex-col items-center p-3 bg-stone-50 rounded-lg">
+                           <div class="text-3xl">🏛️</div> <span class="font-bold mt-2">政府対応</span><p class="text-xs text-stone-500">初期対応の遅れ</p>
+                        </div>
+                        <div class="hidden md:flex items-center justify-center text-3xl text-stone-400">=</div>
+                        <div class="flex flex-col items-center p-3 bg-emerald-100 text-emerald-800 rounded-lg">
+                            <div class="text-3xl">🍚❓</div><span class="font-bold mt-2">米不足</span><p class="text-xs">市場の混乱</p>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>需給バランスの崩壊</h3>
+                <p>このチャートは、日本の米の需給バランスがどのように崩れていったかを示しています。棒グラフは供給量（期初在庫＋生産量）と需要量、折れ線グラフは期末の在庫量です。2023年に需要が予測を大きく上回り、在庫が急減したことが分かります。</p>
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                    <div class="chart-container">
+                        <canvas id="supplyDemandChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chapter2" class="mb-24">
+                <h2>第2章 国家備蓄米は「良いコメ」なのか？</h2>
+                <p class="mt-4 text-lg text-stone-600">米不足の切り札として登場した「国家備蓄米」。しかし、「古くて美味しくないのでは？」というイメージを持つ人も少なくありません。果たしてその実態は？ここでは備蓄米の品質と管理の真実に迫ります。各質問をクリックして答えを確認してみましょう。</p>
+                
+                <div class="mt-12 space-y-4 accordion-container">
+                    <div class="accordion-item bg-white rounded-xl shadow-lg border border-stone-200">
+                        <button class="accordion-header w-full flex justify-between items-center text-left p-6">
+                            <span class="text-lg font-semibold text-stone-800">Q1. 備蓄米って、そもそも何のため？</span>
+                            <span class="plus-minus text-2xl font-light text-emerald-600 transform transition-transform">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="p-6 pt-0 text-stone-600">
+                                <p><strong>A. 不作や災害など、万が一の供給不足に備えるための「保険」です。</strong> 1995年に制度が始まり、国は常に100万トン程度の米を備蓄しています。これは10年に一度の大不作が起きても、国民の需要に応えられる量です。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="accordion-item bg-white rounded-xl shadow-lg border border-stone-200">
+                        <button class="accordion-header w-full flex justify-between items-center text-left p-6">
+                            <span class="text-lg font-semibold text-stone-800">Q2. やっぱり「古米」で美味しくない？</span>
+                            <span class="plus-minus text-2xl font-light text-emerald-600 transform transition-transform">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="p-6 pt-0 text-stone-600">
+                                <p><strong>A. それは誤解です。品質は徹底管理されています。</strong></p>
+                                <ul class="list-disc list-inside mt-2 space-y-1">
+                                    <li><strong>選ばれる米:</strong> 私たちが普段食べるのと同じ、品質が安定した国産米です。</li>
+                                    <li><strong>保存方法:</strong> 品質が落ちにくい「玄米」の状態で、温度15℃以下・湿度60%以下の専用低温倉庫で厳重に保管されます。</li>
+                                    <li><strong>味:</strong> 適切な炊き方をすれば、新米と遜色なく美味しく食べられます。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item bg-white rounded-xl shadow-lg border border-stone-200">
+                        <button class="accordion-header w-full flex justify-between items-center text-left p-6">
+                            <span class="text-lg font-semibold text-stone-800">Q3. ずっと同じ米を保管してるの？</span>
+                            <span class="plus-minus text-2xl font-light text-emerald-600 transform transition-transform">+</span>
+                        </button>
+                        <div class="accordion-content">
+                            <div class="p-6 pt-0 text-stone-600">
+                                <p><strong>A. いいえ、「回転備蓄」という方法で鮮度を保っています。</strong></p>
+                                <p>古いものから順に飼料用などで売却し、新しい米を買い入れるというサイクルを繰り返しています。これにより、備蓄米全体の品質を高く維持しているのです。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="chapter3" class="mb-24">
+                <h2>第3章 随意契約、なぜ問題になったのか？</h2>
+                <p class="mt-4 text-lg text-stone-600">政府は米価を抑えるため、備蓄米を特定の業者に直接、市場価格の半値近くで売る「随意契約」に踏み切りました。この異例の措置は、なぜ大きな論争を巻き起こしたのでしょうか。その背景には、公平性や透明性の問題、そして日本の農業が長年抱える根深い課題がありました。</p>
+
+                <h3>随意契約の光と影</h3>
+                 <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                        <h4 class="font-bold text-xl text-center text-emerald-700">目的 (光)</h4>
+                        <p class="mt-4 text-stone-600 text-center">市場価格の半額で備蓄米を放出し、小売価格を強制的に引き下げ、高騰を抑える。</p>
+                        <div class="mt-6 text-center">
+                            <div class="text-4xl font-bold text-emerald-600">約10,700円</div>
+                            <div class="text-sm text-stone-500">/ 60kg (随意契約価格)</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                        <h4 class="font-bold text-xl text-center text-red-700">問題点 (影)</h4>
+                         <ul class="mt-4 list-disc list-inside text-stone-600 space-y-2">
+                            <li><strong>不公平:</strong> なぜ大手企業だけが安く買えるのか？</li>
+                            <li><strong>不透明:</strong> 価格決定のプロセスが見えにくい。</li>
+                            <li><strong>利益供与:</strong> 特定の業者を優遇しているのでは？</li>
+                            <li><strong>原則違反:</strong> 国有財産の売却は入札が原則。</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <h3>根本にある「農政トライアングル」と減反政策</h3>
+                <p>今回の騒動の根っこには、さらに大きな構造問題があります。それは、JA・農水省・族議員が固く結びついた「農政トライアングル」と、約50年も続いた「減反政策」の存在です。この構造が日本の米の生産力を弱め、食料安全保障を脆弱にしてきたという批判があります。</p>
+                <div class="mt-8 p-6 bg-white rounded-xl shadow-lg border border-stone-200">
+                    <h4 class="text-center font-bold text-xl mb-6">日本の米政策をめぐる構造</h4>
+                    <div class="flex flex-col md:flex-row items-center justify-around space-y-4 md:space-y-0">
+                        <div class="text-center p-4 bg-stone-100 rounded-lg w-48">
+                            <div class="text-2xl">🏛️</div>
+                            <div class="font-bold">農林水産省</div>
+                            <p class="text-xs">政策を企画</p>
+                        </div>
+                        <div class="text-2xl text-stone-400">🤝</div>
+                         <div class="text-center p-4 bg-stone-100 rounded-lg w-48">
+                            <div class="text-2xl">🌱</div>
+                            <div class="font-bold">JA (農業協同組合)</div>
+                            <p class="text-xs">農家を組織、集票力</p>
+                        </div>
+                         <div class="text-2xl text-stone-400">🤝</div>
+                         <div class="text-center p-4 bg-stone-100 rounded-lg w-48">
+                            <div class="text-2xl">👨‍⚖️</div>
+                            <div class="font-bold">農林族議員</div>
+                            <p class="text-xs">政治力で予算確保</p>
+                        </div>
+                    </div>
+                    <div class="text-center mt-6">
+                        <p class="text-stone-600">この三者が連携し、「減反（米の生産調整）」を続けることで米価を高く維持し、農家を保護する構造が続いてきました。しかし、これが国際競争力の低下や、有事への対応力不足を招いたという指摘があります。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="conclusion" class="mb-24">
+                <h2>結論：令和の米騒動が私たちに突きつけた課題</h2>
+                <p class="mt-4 text-lg text-stone-600">「令和の米騒動」は、天候不順や一時的なパニックだけでなく、日本の食料供給システムと農業政策が抱える根深い問題を浮き彫りにしました。この経験をただの「騒動」で終わらせず、未来への教訓としなければなりません。</p>
+                <div class="mt-12 bg-emerald-50 border-l-4 border-emerald-500 p-6 rounded-r-lg">
+                     <h3 class="!mt-0 !border-none !pl-0 text-emerald-800">未来への4つの提言</h3>
+                     <ol class="mt-4 space-y-4">
+                        <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 flex items-center justify-center bg-emerald-500 text-white rounded-full font-bold mr-4">1</span>
+                            <span class="text-stone-700"><strong>需要予測の改善:</strong> 人口動態だけでなく、インバウンド等の市場の変化を捉えた、より精度の高い需要予測システムを構築する。</span>
+                        </li>
+                         <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 flex items-center justify-center bg-emerald-500 text-white rounded-full font-bold mr-4">2</span>
+                            <span class="text-stone-700"><strong>生産基盤の再構築:</strong> 長期的な視点で減反政策を見直し、国際競争力のある強い米生産体制へ転換。食料安全保障を強化する。</span>
+                        </li>
+                         <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 flex items-center justify-center bg-emerald-500 text-white rounded-full font-bold mr-4">3</span>
+                            <span class="text-stone-700"><strong>介入の透明性確保:</strong> 備蓄米放出などの政府介入は、特定の団体に偏らない、公平で透明性の高いプロセスを徹底する。</span>
+                        </li>
+                         <li class="flex items-start">
+                            <span class="flex-shrink-0 h-6 w-6 flex items-center justify-center bg-emerald-500 text-white rounded-full font-bold mr-4">4</span>
+                            <span class="text-stone-700"><strong>情報共有の強化:</strong> 生産者から消費者まで、サプライチェーン全体で情報を共有し、市場の混乱を未然に防ぐ体制を築く。</span>
+                        </li>
+                     </ol>
+                </div>
+            </section>
+
+            <section id="gemini-feature" class="mb-12">
+                <h2>✨ AI専門家への質問箱 ✨</h2>
+                <p class="mt-4 text-lg text-stone-600">「令和の米騒動」について、さらに疑問に思ったことはありませんか？ここに質問を入力して、「質問する」ボタンを押すと、AIの専門家があなたの疑問にお答えします。このページの情報を踏まえて、より深い洞察を提供します。</p>
+                <div class="mt-8 bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                    <textarea id="questionInput" class="w-full p-3 border border-stone-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-y min-h-[100px]" placeholder="日本の農業政策の課題について、もっと詳しく教えてください。" rows="4"></textarea>
+                    <button id="askGeminiButton" class="mt-4 px-6 py-3 bg-emerald-600 text-white font-bold rounded-md hover:bg-emerald-700 transition-colors flex items-center justify-center">
+                        <span id="buttonText">質問する✨</span>
+                        <div id="loadingSpinner" class="loading-spinner ml-2 hidden"></div>
+                    </button>
+                    <div id="answerArea" class="mt-6 p-4 bg-stone-50 rounded-md border border-stone-200 text-stone-700 hidden">
+                        <h3 class="!mt-0 !border-none !pl-0 text-emerald-800">AI専門家の回答:</h3>
+                        <p id="answerText" class="mt-2 text-stone-600"></p>
+                    </div>
+                    <div id="errorArea" class="mt-6 p-4 bg-red-50 rounded-md border border-red-200 text-red-700 hidden">
+                        <p id="errorMessage"></p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+    
+    <footer class="bg-stone-800 text-white">
+        <div class="container mx-auto py-4 px-5 text-center">
+            <p class="text-stone-400 text-sm">&copy; 2025 YouTube大学 | インタラクティブ解説. All Rights Reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            
+            function drawMenuIcon(isOpen = false) {
+                const canvas = document.getElementById('menu-icon');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const width = canvas.width;
+                const height = canvas.height;
+                ctx.clearRect(0, 0, width, height);
+                ctx.strokeStyle = '#44403c'; // stone-700
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                
+                if (isOpen) {
+                    ctx.beginPath();
+                    ctx.moveTo(4, 4);
+                    ctx.lineTo(20, 20);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(20, 4);
+                    ctx.lineTo(4, 20);
+                    ctx.stroke();
+                } else {
+                    ctx.beginPath();
+                    ctx.moveTo(3, 6);
+                    ctx.lineTo(21, 6);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(3, 12);
+                    ctx.lineTo(21, 12);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.moveTo(3, 18);
+                    ctx.lineTo(21, 18);
+                    ctx.stroke();
+                }
+            }
+            
+            const mobileMenuButton = document.getElementById('mobile-menu-button');
+            const mobileMenu = document.getElementById('mobile-menu');
+            let isMenuOpen = false;
+
+            drawMenuIcon(isMenuOpen);
+
+            mobileMenuButton.addEventListener('click', () => {
+                isMenuOpen = !isMenuOpen;
+                mobileMenu.classList.toggle('hidden');
+                drawMenuIcon(isMenuOpen);
+            });
+
+
+            const priceChartCtx = document.getElementById('priceChart').getContext('2d');
+            new Chart(priceChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['2024年2月', '2025年1月', '2025年2月'],
+                    datasets: [{
+                        type: 'bar',
+                        label: 'うるち米(5kg)小売価格 (円)',
+                        data: [2300, null, 4239],
+                        backgroundColor: 'rgba(209, 213, 219, 0.6)',
+                        borderColor: 'rgba(156, 163, 175, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y-price',
+                    }, {
+                        type: 'line',
+                        label: '米類 消費者物価指数 (対前年同月比 %)',
+                        data: [null, 70.9, null],
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        tension: 0.1,
+                        fill: true,
+                        yAxisID: 'y-cpi',
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        'y-price': {
+                            type: 'linear',
+                            position: 'left',
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '価格 (円)'
+                            }
+                        },
+                        'y-cpi': {
+                            type: 'linear',
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: '上昇率 (%)'
+                            },
+                            grid: {
+                                drawOnChartArea: false, 
+                            },
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+
+            const supplyDemandCtx = document.getElementById('supplyDemandChart').getContext('2d');
+            new Chart(supplyDemandCtx, {
+                data: {
+                    labels: ['2022年見込', '2023年実績', '2024年見込'],
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: '供給量 (期初在庫+生産量)',
+                            data: [888, 845, 825],
+                            backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            type: 'bar',
+                            label: '需要量',
+                            data: [694, 705, 673],
+                            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            type: 'line',
+                            label: '期末在庫量',
+                            data: [194, 140, 152],
+                            borderColor: '#1d4ed8',
+                            backgroundColor: 'rgba(29, 78, 216, 0.1)',
+                            tension: 0.1,
+                            fill: true,
+                            yAxisID: 'y-stock'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '日本の米の需給バランスと在庫量の推移 (万トン)'
+                        },
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: false,
+                        },
+                         y: {
+                            beginAtZero: true,
+                            stacked: false,
+                            title: {
+                                display: true,
+                                text: '数量 (万トン)'
+                            }
+                        },
+                        'y-stock': {
+                           position: 'right',
+                           beginAtZero: true,
+                           grid: {
+                                drawOnChartArea: false, 
+                            },
+                            title: {
+                                display: true,
+                                text: '在庫量 (万トン)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            const accordionContainer = document.querySelector('.accordion-container');
+            accordionContainer.addEventListener('click', function(e) {
+                const header = e.target.closest('.accordion-header');
+                if (!header) return;
+
+                const item = header.parentElement;
+                const content = item.querySelector('.accordion-content');
+                const plusMinus = item.querySelector('.plus-minus');
+                const isOpen = content.style.maxHeight;
+
+                // Close all other items
+                item.parentElement.querySelectorAll('.accordion-item').forEach(otherItem => {
+                    if (otherItem !== item) {
+                        otherItem.querySelector('.accordion-content').style.maxHeight = null;
+                        otherItem.querySelector('.plus-minus').textContent = '+';
+                        otherItem.querySelector('.plus-minus').classList.remove('rotate-45');
+                    }
+                });
+
+                if (isOpen) {
+                    content.style.maxHeight = null;
+                    plusMinus.textContent = '+';
+                    plusMinus.classList.remove('rotate-45');
+                } else {
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    plusMinus.textContent = '+';
+                    plusMinus.classList.add('rotate-45');
+                }
+            });
+
+            const sections = document.querySelectorAll('section');
+            const navLinks = document.querySelectorAll('.nav-link');
+
+            window.addEventListener('scroll', () => {
+                let current = '';
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    if (pageYOffset >= sectionTop - 80) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href').includes(current)) {
+                        link.classList.add('active');
+                    }
+                });
+            });
+            
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    if (this.parentElement.parentElement.id === 'mobile-menu') {
+                         isMenuOpen = false;
+                         mobileMenu.classList.add('hidden');
+                         drawMenuIcon(isMenuOpen);
+                    }
+                });
+            });
+
+            // Gemini API integration logic
+            const questionInput = document.getElementById('questionInput');
+            const askGeminiButton = document.getElementById('askGeminiButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const answerArea = document.getElementById('answerArea');
+            const answerText = document.getElementById('answerText');
+            const errorArea = document.getElementById('errorArea');
+            const errorMessage = document.getElementById('errorMessage');
+
+            askGeminiButton.addEventListener('click', async () => {
+                const prompt = questionInput.value.trim();
+                if (!prompt) {
+                    errorArea.classList.remove('hidden');
+                    errorMessage.textContent = '質問を入力してください。';
+                    answerArea.classList.add('hidden');
+                    return;
+                }
+
+                answerArea.classList.add('hidden');
+                errorArea.classList.add('hidden');
+                buttonText.textContent = ''; // Hide text
+                loadingSpinner.classList.remove('hidden'); // Show spinner
+                askGeminiButton.disabled = true; // Disable button
+
+                try {
+                    let chatHistory = [];
+                    // Provide context to the LLM from the document
+                    const context = `
+あなたは日本の米と農業政策に関する専門家です。以下の情報に基づいて、ユーザーの質問に答えてください。
+---
+日本の米騒動の背景：2024年に米の価格が高騰し、スーパーから米が一時的に消えた。作況指数は平年並みだが、品質低下（猛暑）、需要急増（外食・インバウンド回復）、流通・投機（買い占め・売り惜しみ）、消費者心理（買いだめ）、政府の初期対応の遅れが複合的に影響した。
+
+国家備蓄米：不作や災害に備える「保険」として1995年から始まり、常に100万トン程度を備蓄。品質は玄米で低温倉庫で厳重管理され、回転備蓄により鮮度を保っている。古米でも適切に炊けば美味しく食べられる。
+
+随意契約の問題：政府が米価抑制のため、市場価格の半値近くで特定の業者に備蓄米を直接売却したことが問題視された。不公平性、不透明性、特定の業者への利益供与、国有財産売却の原則（入札）違反が指摘された。
+
+農政トライアングルと減反政策：JA、農林水産省、農林族議員が連携し、減反政策を続けることで米価を高く維持し、農家を保護してきた構造。これが国際競争力の低下や食料安全保障の脆弱化を招いたとの批判がある。
+
+未来への提言：需要予測の改善、生産基盤の再構築、政府介入の透明性確保、情報共有の強化が必要。
+---
+ユーザーの質問：${prompt}
+
+専門家としての回答：
+`;
+
+                    chatHistory.push({ role: "user", parts: [{ text: context }] });
+                    const payload = { contents: chatHistory };
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const result = await response.json();
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        answerText.textContent = text;
+                        answerArea.classList.remove('hidden');
+                    } else {
+                        throw new Error('AIからの回答が得られませんでした。');
+                    }
+                } catch (error) {
+                    console.error('Gemini API Error:', error);
+                    errorArea.classList.remove('hidden');
+                    errorMessage.textContent = `回答の取得中にエラーが発生しました: ${error.message} もう一度お試しください。`;
+                } finally {
+                    loadingSpinner.classList.add('hidden'); // Hide spinner
+                    buttonText.textContent = '質問する✨'; // Restore button text
+                    askGeminiButton.disabled = false; // Enable button
+                }
+            });
+        });
+    </script>
+</body>
+</html>
